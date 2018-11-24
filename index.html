@@ -1,0 +1,186 @@
+<html>
+    <head>
+        <style>
+            input[type=button] {
+                width: 200px;
+                height: 50px;
+                margin: 10px;
+            }
+            canvas {
+                margin: 10px;
+            }
+            span {
+                margin: 10px;
+            }
+        </style>
+        <script>
+            const simulate = (squareData, commands, initialRoverState) => {
+                const orientations = {
+                    "N": {
+                        x: 0,
+                        y: -1,
+                        "L": "W",
+                        "R": "E"
+                    },
+                    "E": {
+                        x: 1,
+                        y: 0,
+                        "L": "N",
+                        "R": "S"
+                    },
+                    "S": {
+                        x: 0,
+                        y: 1,
+                        "L": "E",
+                        "R": "W"
+                    },
+                    "W": {
+                        x: -1,
+                        y: 0,
+                        "L": "S",
+                        "R": "N"
+                    }
+                }
+
+                const roverState = {
+                    ...initialRoverState,
+                    valid: true
+                }
+
+                const history = []
+
+                while (commands.length > 0) {
+                    const nextCommand = commands.charAt(0)
+                    commands = commands.substr(1)
+                    
+                    switch (nextCommand) {
+                        case 'A':
+                            roverState.x += orientations[roverState.orientation].x
+                            roverState.y += orientations[roverState.orientation].y
+                            break
+
+                        case 'L':
+                            roverState.orientation = orientations[roverState.orientation].L
+                            break
+
+                        case 'R':
+                            roverState.orientation = orientations[roverState.orientation].R
+                            break
+                    }
+
+                    roverState.valid =  roverState.x >= 0 && roverState.x < squareData.width &&
+                                        roverState.y >= 0 && roverState.y < squareData.height
+
+                    history.push({
+                        ...roverState
+                    })
+                }
+
+                return {
+                    roverFinalState: roverState,
+                    history: history
+                }
+            }
+
+            const startSimulation = () => {
+                document.querySelector('#start').disabled = true
+
+                const result = simulate({
+                    width: parseInt(document.querySelector('#square_width').value, 10),
+                    height: parseInt(document.querySelector('#square_height').value, 10)
+                }, document.querySelector('#commands').value, {
+                    x: parseInt(document.querySelector('#state_x').value, 10),
+                    y: parseInt(document.querySelector('#state_y').value, 10),
+                    orientation: document.querySelector('#state_orientation').value
+                })
+
+                document.querySelector('#results').innerHTML = `Result: ${result.roverFinalState.valid}, ${result.roverFinalState.orientation}, (${result.roverFinalState.x}, ${result.roverFinalState.y})`
+
+                startAnimation(result.history, {
+                    width: parseInt(document.querySelector('#square_width').value, 10),
+                    height: parseInt(document.querySelector('#square_height').value, 10)
+                })
+                .then(() => {
+                    document.querySelector('#start').disabled = false
+                })
+            }
+
+            const startAnimation = (result, squareData) => {
+                return new Promise((resolve, reject) => {
+                    const canvas = document.getElementById('animation')
+                    const ctx = canvas.getContext('2d')
+                    const canvasWidth = canvas.width
+                    const canvasHeight = canvas.height
+                    const cellSize = {
+                        width: canvasWidth/squareData.width,
+                        height: canvasHeight/squareData.height
+                    }
+
+                    const drawSquare = () => {
+                        ctx.fillStyle = '#000000'
+                        ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+                        ctx.fillStyle = '#00ff00'
+                        for (let x=0;x<squareData.width;x++) {
+                            ctx.fillRect(x*(canvasWidth/squareData.width), 0, 2, canvasHeight)
+                        }
+                        for (let y=0;y<squareData.height;y++) {
+                            ctx.fillRect(0, y*(canvasHeight/squareData.height), canvasWidth, 2)
+                        }
+                    }
+
+                    const drawRover = (x, y, color) => {
+                        ctx.fillStyle = color
+                        ctx.fillRect(x + cellSize.width*0.25, y + cellSize.height*0.25, cellSize.width*0.5, cellSize.height*0.5)
+                    }
+
+                    const renderMovement = (x1, y1, color, time) => {
+                        return new Promise((resolve, reject) => {
+                            setTimeout(() => {
+                                drawSquare()
+                                drawRover(x1, y1, color)
+                                resolve()
+                            }, time)
+                        })
+                    }
+                    
+                    (async function() {
+                        for (let i=0;i<result.length;i++) {
+                            let position = result[i]
+                            await renderMovement(position.x * cellSize.width, position.y * cellSize.height, i === result.length-1 ? '#ff0000' : '#FFff00', 300)
+                        }
+                        resolve()
+                    })()
+                })
+            }
+        </script>
+    </head>
+    <body>
+        <p>Commands: <input id="commands" type="text" value="RARARARALALALALA"></p>
+        <p>Initial State:
+            <ul>
+                <li>x: <input id="state_x" type="number" value=1></li>
+                <li>y: <input id="state_y" type="number" value=1></li>
+                <li>orientation: 
+                        <select id="state_orientation">
+                            <option value="N">N</option>
+                            <option value="S">S</option>
+                            <option value="E">E</option>
+                            <option value="W">W</option>
+                        </select>
+                </li>
+            </ul>
+        </p>
+        <p>
+            Square:
+            <ul>
+                <li>width: <input id="square_width" type="number" value="5"></li>
+                <li>height: <input id="square_height" type="number" value="5"></li>
+            </ul>
+        </p>
+
+        <input type="button" id="start" value="Start" onClick="startSimulation()"><br>
+
+        <canvas id="animation" width="200" height="200"></canvas><br>
+        <span id="results"></span>
+    </body>
+</html>
