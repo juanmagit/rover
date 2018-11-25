@@ -42,10 +42,9 @@
                     }
                 }
 
-                const roverState = {
-                    ...initialRoverState,
+                const roverState = Object.assign({}, initialRoverState, {
                     valid: true
-                }
+                })
 
                 const history = []
 
@@ -71,9 +70,7 @@
                     roverState.valid =  roverState.x >= 0 && roverState.x < squareData.width &&
                                         roverState.y >= 0 && roverState.y < squareData.height
 
-                    history.push({
-                        ...roverState
-                    })
+                    history.push(Object.assign({}, roverState))
                 }
 
                 return {
@@ -128,25 +125,79 @@
                         }
                     }
 
-                    const drawRover = (x, y, color) => {
+                    const drawRover = (x, y, angle, color) => {
+                        ctx.save()
+
+                        ctx.translate(x + cellSize.width*0.5, y + cellSize.height*0.5)
+                        ctx.rotate(angle)
+                        ctx.translate(-cellSize.width*0.5, -cellSize.height*0.5)
+
                         ctx.fillStyle = color
-                        ctx.fillRect(x + cellSize.width*0.25, y + cellSize.height*0.25, cellSize.width*0.5, cellSize.height*0.5)
+                        ctx.fillRect(cellSize.width*0.25, cellSize.height*0.25, cellSize.width*0.5, cellSize.height*0.5)
+
+                        ctx.lineWidth = 2
+
+                        ctx.beginPath()
+                        ctx.moveTo(cellSize.width*0.75, cellSize.height*0.5)
+                        ctx.lineTo(cellSize.width*0.5, cellSize.height*0.25)
+                        ctx.lineTo(cellSize.width*0.25, cellSize.height*0.5)
+                        ctx.closePath()
+                        ctx.stroke()
+
+                        ctx.restore()
                     }
 
-                    const renderMovement = (x1, y1, color, time) => {
+                    const renderMovement = (x0, y0, x1, y1, angle0, angle1, color, time) => {
+                        if (Math.abs(angle1-angle0) > Math.PI) {
+                            if (angle1 < angle0) {
+                                angle1 += Math.PI*2
+                            } else {
+                                angle0 += Math.PI*2
+                            }
+                        }
+
+                        const initTime = new Date().getTime()
+                        const finishTime = initTime + time
+
                         return new Promise((resolve, reject) => {
-                            setTimeout(() => {
-                                drawSquare()
-                                drawRover(x1, y1, color)
-                                resolve()
-                            }, time)
+                            
+                            const intervalHandler = setInterval(() => {
+                                const currentTime = new Date().getTime()
+                                const progress = (currentTime - initTime) / time
+
+                                if (currentTime >= finishTime) {
+                                    clearInterval(intervalHandler)
+
+                                    drawSquare()
+                                    drawRover(x1, y1, angle1, color)
+
+                                    resolve()
+                                } else {
+                                    const x = (progress * (x1-x0)) + x0
+                                    const y = (progress * (y1-y0)) + y0
+                                    const angle = (progress * (angle1-angle0)) + angle0
+
+                                    drawSquare()
+                                    drawRover(x, y, angle, color)
+                                }
+                            }, 100)
                         })
                     }
                     
                     (async function() {
+                        const orientationsToRadias = {
+                            'N': 0,
+                            'E': Math.PI/2,
+                            'S': Math.PI,
+                            'W': Math.PI*3/2
+                        }
                         for (let i=0;i<result.length;i++) {
-                            let position = result[i]
-                            await renderMovement(position.x * cellSize.width, position.y * cellSize.height, i === result.length-1 ? '#ff0000' : '#FFff00', 300)
+                            let previous = result[Math.max(i-1, 0)]
+                            let current = result[i]
+                            let previousAngle = orientationsToRadias[previous.orientation]
+                            let angle = orientationsToRadias[current.orientation]
+                            
+                            await renderMovement(previous.x * cellSize.width, previous.y * cellSize.height, current.x * cellSize.width, current.y * cellSize.height, previousAngle, angle, i === result.length-1 ? '#ff0000' : '#FFff00', 500)
                         }
                         resolve()
                     })()
